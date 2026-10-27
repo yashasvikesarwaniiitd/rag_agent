@@ -138,6 +138,52 @@ def test_unknown_retrieval_mode_is_rejected():
                    retrieval="magic")
 
 
+def test_reranker_reorders_the_pool_and_sees_section_labels():
+    from rag.adapters.rerankers import FunctionReranker
+
+    store = MemoryStore()
+    pages = [Page(f"d{i}", f"d{i}.pdf", 1, f"Generic enrollment text {i}.") for i in range(5)]
+    ingest(["x"], loader=ListLoader({"x": pages}), embedder=ConstantEmbedder(), store=store)
+    target = next(c for c in store.all_chunks() if c.doc_id == "d3")
+    seen = []
+
+    def score(q, text):
+        seen.append(text)
+        return 1.0 if "enrollment text 3" in text else 0.0
+
+    rr = FunctionReranker(score)
+    svc = RagService(embedder=ConstantEmbedder(), store=store, llm=ScriptedLLM([]), top_k=2,
+                     reranker=rr, rerank_pool=5)
+    hits = svc.retrieve("which one")
+    assert hits[0].chunk.id == target.id
+    assert rr.calls == [("which one", 5)]
+
+
+def test_reranker_only_sees_the_pool_not_the_whole_index():
+    from rag.adapters.rerankers import FunctionReranker
+
+    rr = FunctionReranker(lambda q, t: 0.0)
+    svc = RagService(embedder=ConstantEmbedder(), store=_constant_store(), llm=ScriptedLLM([]),
+                     top_k=2, reranker=rr, rerank_pool=3)
+    svc.retrieve("anything")
+    assert rr.calls[0][1] == 3
+
+
+def test_reranker_input_includes_the_section_label():
+    from rag.adapters.rerankers import FunctionReranker
+    from rag.domain.models import Line
+
+    lines = (Line("60.3 - Credentialing", heading=True), Line("Every 3 years."))
+    store = MemoryStore()
+    ingest(["x"], loader=ListLoader({"x": [Page("m", "m.pdf", 1, "", lines, "Manual")]}),
+           embedder=ConstantEmbedder(), store=store)
+    texts = []
+    rr = FunctionReranker(lambda q, t: texts.append(t) or 0.0)
+    RagService(embedder=ConstantEmbedder(), store=store, llm=ScriptedLLM([]),
+               reranker=rr).retrieve("how often")
+    assert texts == ["Manual > 60.3 - Credentialing\nEvery 3 years."]
+
+
 def test_reingesting_a_document_replaces_its_old_chunks():
     embedder, store = HashingEmbedder(), MemoryStore()
     v1 = [Page("doc", "doc.pdf", p, f"old text page {p}") for p in (1, 2, 3)]

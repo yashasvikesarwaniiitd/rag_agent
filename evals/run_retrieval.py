@@ -1,7 +1,10 @@
 """Score retrieval against evals/golden.jsonl. Free: no model calls, only local search.
 
-    uv run python evals/run_retrieval.py                    # all modes, print table
+    uv run python evals/run_retrieval.py                    # default modes, print table
     uv run python evals/run_retrieval.py --save baseline    # also write evals/results/baseline.md
+    uv run python evals/run_retrieval.py --modes vector hybrid hybrid+rerank
+
+A "+rerank" mode uses RAG_RERANK_MODEL, or the default MiniLM re-ranker if that is unset.
 
 Decline rows are scored on the off-topic cutoff alone (best vector match < RAG_MIN_SCORE),
 because that is the only decline that happens before a model call. A decline that needs
@@ -20,7 +23,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from rag.adapters.llms import ExtractiveLLM  # noqa: E402
-from rag.config import Settings, build_embedder, build_store  # noqa: E402
+from rag.adapters.rerankers import DEFAULT_RERANK_MODEL  # noqa: E402
+from rag.config import Settings, build_embedder, build_reranker, build_store  # noqa: E402
 from rag.application.answer import RagService  # noqa: E402
 from rag.domain.scoring import Expected, first_relevant_rank, summarise  # noqa: E402
 
@@ -82,9 +86,14 @@ def main() -> int:
 
     s = Settings.from_env()
     embedder, store = build_embedder(s), build_store(s)
+    reranker = None
+    if any(m.endswith("+rerank") for m in args.modes):
+        reranker = build_reranker(s, s.rerank_model or DEFAULT_RERANK_MODEL)
     services = {m: RagService(embedder=embedder, store=store, llm=ExtractiveLLM(),
-                              top_k=s.top_k, retrieval=m, candidates=s.candidates,
-                              min_score=s.min_score) for m in args.modes}
+                              top_k=s.top_k, retrieval=m.removesuffix("+rerank"),
+                              candidates=s.candidates, min_score=s.min_score,
+                              reranker=reranker if m.endswith("+rerank") else None,
+                              rerank_pool=s.rerank_pool) for m in args.modes}
     rows = load_golden()
     per_q, declines = evaluate(rows, services, s.top_k)
     text = report(rows, per_q, declines, args.modes, s.top_k)

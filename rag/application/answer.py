@@ -6,7 +6,7 @@ import time
 from ..domain.citations import check_answer
 from ..domain.keyword import BM25, reciprocal_rank_fusion
 from ..domain.models import Answer, Citation, Hit
-from ..ports import LLM, Embedder, VectorStore
+from ..ports import LLM, Embedder, Reranker, VectorStore
 from .prompts import SYSTEM, build_user_prompt
 
 
@@ -16,11 +16,16 @@ class RagService:
     min_score is the off-topic cutoff: if no chunk's vector similarity reaches it, the
     question is declined before any model call. It is checked on the VECTOR score because
     that is on a fixed 0-1 scale; BM25 scores grow with corpus size and can't be thresholded.
+
+    reranker, when given, re-orders the first `rerank_pool` candidates (vector + keyword
+    results merged) before the top_k are taken. On the golden set every answer was already
+    in that pool; what was wrong was the order.
     """
 
     def __init__(self, *, embedder: Embedder, store: VectorStore, llm: LLM, top_k: int = 5,
                  max_tokens: int = 1024, retrieval: str = "hybrid", candidates: int = 30,
-                 min_score: float = 0.0):
+                 min_score: float = 0.0, reranker: Reranker | None = None,
+                 rerank_pool: int = 25):
         if retrieval not in {"hybrid", "vector"}:
             raise ValueError(f"retrieval must be 'hybrid' or 'vector', got {retrieval!r}")
         self.embedder = embedder
@@ -31,6 +36,8 @@ class RagService:
         self.retrieval = retrieval
         self.candidates = max(candidates, top_k)
         self.min_score = min_score
+        self.reranker = reranker
+        self.rerank_pool = rerank_pool
         self._bm25: BM25 | None = None
         self._chunks: dict = {}
         self._bm25_size = -1
@@ -51,13 +58,26 @@ class RagService:
         vector_hits = self.store.search(self.embedder.embed_query(question), self.candidates)
         best = max((h.score for h in vector_hits), default=0.0)
         if self.retrieval == "vector":
-            return vector_hits[: self.top_k], best
+            ranked = vector_hits
+        else:
+            keyword_hits = self._keyword_index().search(question, self.candidates)
+            fused = reciprocal_rank_fusion([[h.chunk.id for h in vector_hits],
+                                            [cid for cid, _ in keyword_hits]])
+            by_id = {h.chunk.id: h.chunk for h in vector_hits} | self._chunks
+            ranked = [Hit(chunk=by_id[cid], score=score) for cid, score in fused]
 
-        keyword_hits = self._keyword_index().search(question, self.candidates)
-        fused = reciprocal_rank_fusion([[h.chunk.id for h in vector_hits],
-                                        [cid for cid, _ in keyword_hits]])
-        by_id = {h.chunk.id: h.chunk for h in vector_hits} | self._chunks
-        return [Hit(chunk=by_id[cid], score=score) for cid, score in fused[: self.top_k]], best
+        if self.reranker is not None and ranked:
+            pool = ranked[: self.rerank_pool]
+            # The re-ranker DOES get the section label, unlike the index: it reads question
+            # and chunk together, so "60.3 Credentialing > Recredentialing" is evidence, not
+            # noise. Measured: MRR 0.69 without the label, 0.81 with it (60-chunk pool).
+            scores = self.reranker.score(question, [
+                f"{h.chunk.context}\n{h.chunk.text}" if h.chunk.context else h.chunk.text
+                for h in pool])
+            # Stable on ties: equal scores keep the order the fast searches gave them.
+            order = sorted(range(len(pool)), key=lambda i: -scores[i])
+            ranked = [Hit(chunk=pool[i].chunk, score=scores[i]) for i in order]
+        return ranked[: self.top_k], best
 
     def retrieve(self, question: str) -> list[Hit]:
         return self.search(question)[0]

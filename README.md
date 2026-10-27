@@ -39,6 +39,17 @@ question -> embed -> top-k chunks -> numbered <source> prompt -> LLM
                               Answer + citations (doc, page)
 ```
 
+Since v0.1, retrieval is three stages:
+
+1. **Vector search** (local bge-small) and **BM25 keyword search**, 30 candidates each.
+2. Merged by reciprocal rank fusion.
+3. The top 25 are **re-ranked** by a local cross-encoder (`ms-marco-MiniLM-L6-v2`, ~90MB).
+   It reads each chunk's section label, e.g. "§ 422.204 … > (b) Basic requirements",
+   alongside the text.
+
+Chunks follow the document's headings. Running headers, revision stamps and the eCFR
+editorial note are dropped before chunking.
+
 An answer that cites nothing, or cites a source that wasn't retrieved, is **never shown**.
 The user gets a decline with the reason instead. The prompt asks the model to cite, and the
 gate makes sure it did.
@@ -63,13 +74,41 @@ uv run pytest
 All tests run offline at $0: a hashing embedder, an in-memory store and a scripted model
 stand in for the real ones. PyMuPDF and Chroma are exercised for real because they are local.
 
+## Evaluation
+
+`evals/golden.jsonl` holds 20 answerable questions (11 in policy wording, 9 in plain English),
+each with the page(s) that answer it, plus 2 that should be declined. Scoring is free, with
+no model calls:
+
+```bash
+uv run python evals/run_retrieval.py --modes vector hybrid hybrid+rerank
+```
+
+| Step | Found in top 5 | MRR | Plain English |
+|---|---|---|---|
+| v0 chunks, vector only | 16/20 | 0.64 | 5/9 |
+| v0 chunks, hybrid | 16/20 | 0.68 | 5/9 |
+| v0.1 chunks, section labels **in** the index | 14/20 | 0.60 | 4/9 |
+| v0.1 chunks, labels kept out of the index | 16/20 | 0.64 | 5/9 |
+| **+ re-ranker reading the labels (current)** | **18/20** | **0.82** | **7/9** |
+
+MRR is 1.0 when the right page always comes first, and 0.2 when it comes fifth. These
+numbers come from 20 questions that were also used to pick settings, so differences of
+one question are noise. Full per-question tables are in `evals/results/`.
+
+Still failing: "Should our plan approve Dr. Patel?" is answered instead of declined, which
+needs the router (v0.3).
+
+**Windows note:** stop the Streamlit app before re-indexing. It holds the index files open,
+and the delete fails with "Device or resource busy".
+
 ## Roadmap
 
 | Version | Adds | Diagram box |
 |---|---|---|
 | **v0.0** | basic RAG, citation gate, CLI + Streamlit | Data Sources -> Vector Store -> answer |
-| v0.1 | heading detection, table preservation, hybrid keyword search | Structure-Aware Chunking |
-| v0.2 | golden set, retrieval precision/recall, faithfulness judge, latency & cost | Evaluation |
+| **v0.1** | hybrid keyword search, golden set + retrieval scorer, heading-aware chunks, re-ranker | Structure-Aware Chunking, Evaluation |
+| v0.2 | faithfulness judge on Haiku answers, latency & cost tracking, table preservation | Evaluation |
 | v0.3 | router (in/out of scope), prompt-injection tests | Conditional Router, Stress Testing |
 | v0.4 | per-chunk summary, keywords, synthetic questions | Metadata Creation |
 | later | planner, multi-agent, human review queue (only if measured need) | Reasoning Engine, Human Validation |

@@ -5,7 +5,8 @@ import streamlit as st
 
 from rag.adapters.loaders import SUPPORTED, FileLoader
 from rag.application.ingest import find_files, ingest
-from rag.config import Settings, build_embedder, build_llm, build_service, build_store
+from rag.config import (Settings, build_embedder, build_llm, build_reranker, build_service,
+                        build_store)
 
 st.set_page_config(page_title="Credentialing RAG", layout="wide")
 settings = Settings.from_env()
@@ -14,6 +15,11 @@ settings = Settings.from_env()
 @st.cache_resource(show_spinner="Loading embedding model...")
 def embedder():
     return build_embedder(settings)
+
+
+@st.cache_resource(show_spinner="Loading re-ranker...")
+def reranker():
+    return build_reranker(settings)
 
 
 @st.cache_resource
@@ -91,7 +97,8 @@ if question := st.chat_input("Ask about credentialing requirements..."):
         st.markdown(question)
     with st.chat_message("assistant"):
         try:
-            service = build_service(settings, embedder(), store(), llm(choice))
+            service = build_service(settings, embedder(), store(), llm(choice),
+                                    reranker=reranker())
             with st.spinner("Searching documents..."):
                 answer = service.ask(question)
         except Exception as exc:

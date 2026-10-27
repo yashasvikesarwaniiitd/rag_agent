@@ -33,6 +33,12 @@ class VectorStore(Protocol):
     def all_chunks(self) -> list[Chunk]: ...
 
 
+class Reranker(Protocol):
+    def score(self, question: str, texts: list[str]) -> list[float]:
+        """One relevance score per text, higher is more relevant. Only the order matters."""
+        ...
+
+
 @dataclass(frozen=True)
 class LLMResult:
     text: str

@@ -12,7 +12,8 @@ from pathlib import Path
 
 from .application.ingest import find_files, ingest
 from .adapters.loaders import FileLoader
-from .config import Settings, build_embedder, build_llm, build_service, build_store
+from .config import (Settings, build_embedder, build_llm, build_reranker, build_service,
+                     build_store)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -53,7 +54,8 @@ def main(argv: list[str] | None = None) -> int:
         # Checked before building the embedder, which loads (and on first use downloads) a model.
         print("No documents are indexed yet. Run: uv run python -m rag ingest", file=sys.stderr)
         return 1
-    service = build_service(s, build_embedder(s), store, build_llm(s, args.llm))
+    service = build_service(s, build_embedder(s), store, build_llm(s, args.llm),
+                            reranker=build_reranker(s))
     answer = service.ask(args.question)
     print(answer.text)
     if answer.refused:

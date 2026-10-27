@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from .adapters.embedders import DEFAULT_EMBED_MODEL
 from .adapters.llms import DEFAULT_MODEL
+from .adapters.rerankers import DEFAULT_RERANK_MODEL
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -24,6 +25,8 @@ class Settings:
     retrieval: str  # "hybrid" | "vector"
     candidates: int
     min_score: float
+    rerank_model: str  # "" = no re-ranker
+    rerank_pool: int
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -40,13 +43,27 @@ class Settings:
             # From 7 probe questions: real ones scored 0.72-0.88, "capital of France" 0.43.
             # Provisional until the golden set gives enough questions to tune it properly.
             min_score=float(os.environ.get("RAG_MIN_SCORE", "0.6")),
+            # On by default: golden set MRR 0.64 -> ~0.8 for ~2s per question on CPU.
+            # Set RAG_RERANK_MODEL= (empty) to turn it off.
+            rerank_model=os.environ.get("RAG_RERANK_MODEL", DEFAULT_RERANK_MODEL),
+            # 25 is chosen for speed; 25/40/60 scored within one question of each other.
+            rerank_pool=int(os.environ.get("RAG_RERANK_POOL", "25")),
         )
 
 
-def build_service(s: Settings, embedder, store, llm):
+def build_reranker(s: Settings, model: str | None = None):
+    name = s.rerank_model if model is None else model
+    if not name:
+        return None
+    from .adapters.rerankers import CrossEncoderReranker
+    return CrossEncoderReranker(name)
+
+
+def build_service(s: Settings, embedder, store, llm, reranker=None):
     from .application.answer import RagService
     return RagService(embedder=embedder, store=store, llm=llm, top_k=s.top_k,
-                      retrieval=s.retrieval, candidates=s.candidates, min_score=s.min_score)
+                      retrieval=s.retrieval, candidates=s.candidates, min_score=s.min_score,
+                      reranker=reranker, rerank_pool=s.rerank_pool)
 
 
 def build_embedder(s: Settings):
