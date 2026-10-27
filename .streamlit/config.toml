@@ -1,3 +1,11 @@
 [browser]
 # Streamlit sends anonymous usage statistics by default; this app keeps everything local.
 gatherUsageStats = false
+
+# Light theme pinned: the citation/source styling in app.py uses light-mode colours.
+[theme]
+base = "light"
+primaryColor = "#4f46e5"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f5f6fa"
+textColor = "#1f2937"
