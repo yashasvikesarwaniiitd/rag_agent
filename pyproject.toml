@@ -1,0 +1,23 @@
+[project]
+name = "rag-agent"
+version = "0.0.1"
+description = "Credentialing RAG: cited answers over public provider-credentialing policy documents"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.116.0",
+    "chromadb>=1.0.0",
+    "pymupdf>=1.26.0",
+    "python-dotenv>=1.2.2",
+    "sentence-transformers>=5.0.0",
+    "streamlit>=1.60.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+
+# Vector index is rebuilt from data/raw with `python -m rag ingest`.
+data/index/
+
+# Source documents stay local until each one is confirmed safe for a public repo.
+data/raw/*
+!data/raw/.gitkeep
