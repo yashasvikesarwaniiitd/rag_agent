@@ -10,6 +10,7 @@ rank 2 scores 0.5, rank 5 scores 0.2, a miss scores 0. It separates "barely foun
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from .models import Chunk
@@ -19,10 +20,24 @@ from .models import Chunk
 class Expected:
     doc: str  # prefix of the chunk's doc_id, e.g. "ecfr_42cfr_422.204"
     page: int
+    # A phrase from the answering passage that the CHUNK must contain ("a | b" = either).
+    # Needed since chunks follow headings: Chapter 6 page 4 holds both section 20.2 (the
+    # consultation answer) and section 30 (written notice), and a page-only match counted the
+    # section 30 chunk as a hit. Empty = any chunk on the page counts.
+    contains: str = ""
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"\s+", " ", text.replace("’", "'")).strip().lower()
 
 
 def is_relevant(chunk: Chunk, expected: list[Expected]) -> bool:
-    return any(chunk.doc_id.startswith(e.doc) and chunk.page == e.page for e in expected)
+    for e in expected:
+        if not (chunk.doc_id.startswith(e.doc) and chunk.page == e.page):
+            continue
+        if not e.contains or any(_norm(alt) in _norm(chunk.text) for alt in e.contains.split("|")):
+            return True
+    return False
 
 
 def first_relevant_rank(chunks: list[Chunk], expected: list[Expected]) -> int | None:

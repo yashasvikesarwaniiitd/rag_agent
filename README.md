@@ -101,6 +101,15 @@ MRR is 1.0 when the right page always comes first, and 0.2 when it comes fifth. 
 numbers come from 20 questions that were also used to pick settings, so differences of
 one question are noise. Full per-question tables are in `evals/results/`.
 
+**Since v0.3 the answer key is section-precise.** Each expected page also names a phrase
+from the passage that actually answers the question, and the retrieved chunk must contain
+it. Before this, a chunk from the right page but the wrong section counted as a hit:
+Chapter 6 p4 holds both §20.2 (the answer) and §30. With the precise key, the current setup
+(hybrid + re-ranker) scores **18/20, MRR 0.86**. Its two misses are the same two plain-English
+questions Haiku answers "not found". Query rewriting was tried and is off
+(`evals/results/v0.3-section-precise.md`). It lifts the target question's answer page into
+the candidates, but the MiniLM re-ranker pushes it back down.
+
 Still failing: "Should our plan approve Dr. Patel?" is answered instead of declined, which
 needs the router (v0.3).
 

@@ -18,6 +18,25 @@ def test_relevance_matches_doc_prefix_and_exact_page():
     assert not is_relevant(chunk("ecfr_42cfr_438.214_medicaid", 1), exp)
 
 
+def test_right_page_wrong_section_does_not_count():
+    # Real case: Chapter 6 p4 holds section 20.2 (the answer) and section 30 (written notice).
+    exp = [Expected("ch6", 4, contains="reviewed by clinical peers")]
+    s30 = Chunk("ch6:p4:c2", "ch6", "ch6.pdf", 4, "Written notice of rules of participation.")
+    s20 = Chunk("ch6:p4:c1", "ch6", "ch6.pdf", 4, "Standards should be  reviewed by Clinical\npeers.")
+    assert not is_relevant(s30, exp)
+    assert is_relevant(s20, exp)  # case and line breaks ignored
+
+
+def test_contains_accepts_alternatives():
+    exp = [Expected("ch6", 10, contains="other requirements | malpractice insurance meeting")]
+    assert is_relevant(Chunk("x", "ch6", "x.pdf", 10, "Current malpractice insurance meeting MA"), exp)
+
+
+def test_golden_phrases_are_not_blank():
+    rows = [json.loads(l) for l in GOLDEN.read_text(encoding="utf-8").splitlines() if l]
+    assert all(e.get("contains", "").strip() for r in rows for e in r["expected"])
+
+
 def test_any_of_several_expected_pages_counts():
     exp = [Expected("a", 1), Expected("b", 13)]
     assert first_relevant_rank([chunk("x", 1), chunk("b", 13)], exp) == 2
