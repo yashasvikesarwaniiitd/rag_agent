@@ -18,9 +18,9 @@ Rules:
 
 
 def build_user_prompt(question: str, hits: list[Hit]) -> str:
-    blocks = [
-        f'<source id="{i}" document="{h.chunk.source}" page="{h.chunk.page}">\n'
-        f"{h.chunk.text}\n</source>"
-        for i, h in enumerate(hits, start=1)
-    ]
+    blocks = []
+    for i, h in enumerate(hits, start=1):
+        section = f' section="{h.chunk.context}"' if h.chunk.context else ""
+        blocks.append(f'<source id="{i}" document="{h.chunk.source}" page="{h.chunk.page}"'
+                      f"{section}>\n{h.chunk.text}\n</source>")
     return "\n\n".join(blocks) + f"\n\nQuestion: {question}"

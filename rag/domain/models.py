@@ -5,13 +5,25 @@ from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
+class Line:
+    text: str
+    heading: bool = False
+
+
+@dataclass(frozen=True)
 class Page:
     """One page of extracted text. `page` is 1-based, matching what a reader sees in a PDF
-    viewer, because that is the number a citation has to point at."""
+    viewer, because that is the number a citation has to point at.
+
+    `lines` is the same text with heading lines marked, when the loader can tell (font size,
+    bold, HTML tags). Empty means "no structure known" and the chunker falls back to `text`.
+    """
     doc_id: str
     source: str
     page: int
     text: str
+    lines: tuple[Line, ...] = ()
+    doc_title: str = ""
 
 
 @dataclass(frozen=True)
@@ -21,12 +33,18 @@ class Chunk:
     source: str
     page: int
     text: str
+    # Where the chunk sits: "document title > section > subsection". Shown to the model and
+    # in citations, but deliberately NOT indexed: measured on the golden set, putting it in
+    # the index cost 2/20 questions, because a section title like "Credentialing, Monitoring,
+    # and Recredentialing" is stamped on ~20 chunks and drowns the one rare word (BM25) or
+    # blurs the vectors. See evals/results/v0.1-structured.md.
+    context: str = ""
 
 
 @dataclass(frozen=True)
 class Hit:
     chunk: Chunk
-    score: float  # cosine similarity, higher is closer
+    score: float  # cosine similarity (vector) or fused rank score (hybrid); higher is better
 
 
 @dataclass(frozen=True)
@@ -36,6 +54,7 @@ class Citation:
     page: int
     chunk_id: str
     snippet: str
+    context: str = ""
 
 
 @dataclass

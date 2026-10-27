@@ -11,7 +11,7 @@ COLLECTION = "credentialing"
 
 def _chunk_from(chunk_id: str, text: str, meta: dict) -> Chunk:
     return Chunk(id=chunk_id, doc_id=meta["doc_id"], source=meta["source"],
-                 page=int(meta["page"]), text=text)
+                 page=int(meta["page"]), text=text, context=meta.get("context", ""))
 
 
 class ChromaStore:
@@ -31,8 +31,8 @@ class ChromaStore:
             ids=[c.id for c in chunks],
             embeddings=vectors,
             documents=[c.text for c in chunks],
-            metadatas=[{"doc_id": c.doc_id, "source": c.source, "page": c.page}
-                       for c in chunks],
+            metadatas=[{"doc_id": c.doc_id, "source": c.source, "page": c.page,
+                        "context": c.context} for c in chunks],
         )
 
     def delete_doc(self, doc_id: str) -> None:

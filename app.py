@@ -68,6 +68,8 @@ def render(answer):
         st.caption(f"Declined: {answer.reason}")
     for c in answer.citations:
         with st.expander(f"[{c.n}] {c.source}, page {c.page}"):
+            if c.context:
+                st.caption(c.context)
             st.text(c.snippet)
     if show_debug and answer.hits:
         with st.expander("Retrieved chunks"):

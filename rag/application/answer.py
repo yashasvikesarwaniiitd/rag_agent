@@ -102,7 +102,8 @@ class RagService:
 
         citations = [
             Citation(n=n, source=hits[n - 1].chunk.source, page=hits[n - 1].chunk.page,
-                     chunk_id=hits[n - 1].chunk.id, snippet=hits[n - 1].chunk.text[:300])
+                     chunk_id=hits[n - 1].chunk.id, snippet=hits[n - 1].chunk.text[:300],
+                     context=hits[n - 1].chunk.context)
             for n in sorted(gate.cited)
         ]
         return done(Answer(text=result.text.strip(), citations=citations, **base))
