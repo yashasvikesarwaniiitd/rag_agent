@@ -35,8 +35,22 @@ def test_answer_prompt_forbids_absence_claims_and_reworded_references():
     # Both rules come from failures in the first Haiku run (evals/results/answers-v0.2-haiku).
     from rag.application.prompts import SYSTEM
 
-    assert "Never state that the documents" in SYSTEM
+    assert "Never answer a related question" in SYSTEM
+    # The first wording banned claims about "the documents"; Haiku switched to "the excerpts
+    # do not say". The rule must name every wording and must not invite partial answers.
+    assert "excerpts, sources, documents or rules do not say" in SYSTEM
+    assert "answer that part" not in SYSTEM
     assert '"this title"' in SYSTEM
+
+
+def test_fact_present_but_off_topic_is_not_correct():
+    from rag.domain.judging import Verdict
+
+    wrong_rule = QuestionResult("q", "plain", False, declined=False, missing=[],
+                                verdict=Verdict(3, 3, (), answers_question=False, reason="DMEPOS"))
+    assert not wrong_rule.correct
+    no_judge = QuestionResult("q", "plain", False, declined=False, missing=[], verdict=None)
+    assert no_judge.correct  # --no-judge runs fall back to the fact check alone
 
 
 def test_case_and_spacing_are_ignored():

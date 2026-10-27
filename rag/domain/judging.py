@@ -115,10 +115,16 @@ class QuestionResult:
 
     @property
     def correct(self) -> bool:
-        """For a should-decline row: it declined. Otherwise: answered with every expected fact."""
+        """For a should-decline row: it declined. Otherwise: answered, every expected fact is
+        present, AND the judge (when it ran) says the answer addresses this question.
+
+        The fact check alone is fooled by a neighbouring rule that shares the fact: asked how
+        often MA networks recredential (3 years), Haiku answered with Medicare enrollment
+        revalidation ("every 3 years for DMEPOS suppliers"), which contains "3 years"."""
         if self.should_decline:
             return self.declined
-        return not self.declined and not self.missing
+        on_topic = self.verdict is None or self.verdict.answers_question
+        return not self.declined and not self.missing and on_topic
 
 
 @dataclass(frozen=True)

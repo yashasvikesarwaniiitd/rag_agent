@@ -69,7 +69,7 @@ def report(results, label: str) -> str:
     cost = "unknown (price missing)" if s.total_cost is None else f"${s.total_cost:.4f}"
     lines = [f"# Answer eval - {label} - {date.today().isoformat()}", "",
              "| Measure | Result |", "|---|---|",
-             f"| Correct (expected fact present) | {s.correct}/{s.answerable} |",
+             f"| Correct (expected fact present AND on topic) | {s.correct}/{s.answerable} |",
              f"| Declined a question it should answer | {s.declined_wrongly}/{s.answerable} |",
              f"| Faithful (every claim supported, per judge) | {s.faithful}/{s.judged} judged |",
              f"| On topic (per judge) | {s.on_topic}/{s.judged} judged |",
