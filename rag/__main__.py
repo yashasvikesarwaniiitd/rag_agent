@@ -12,8 +12,8 @@ from pathlib import Path
 
 from .application.ingest import find_files, ingest
 from .adapters.loaders import FileLoader
-from .config import (Settings, build_embedder, build_llm, build_reranker, build_service,
-                     build_store)
+from .config import (Settings, build_embedder, build_llm, build_reranker, build_rewriter,
+                     build_service, build_store)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -56,14 +56,18 @@ def main(argv: list[str] | None = None) -> int:
         # Checked before building the embedder, which loads (and on first use downloads) a model.
         print("No documents are indexed yet. Run: uv run python -m rag ingest", file=sys.stderr)
         return 1
+    paid = (args.llm or s.llm) == "anthropic"
     service = build_service(s, build_embedder(s), store, build_llm(s, args.llm),
-                            reranker=build_reranker(s))
+                            reranker=build_reranker(s),
+                            rewriter=build_rewriter(s, paid=paid) if s.rewrite else None)
     answer = service.ask(args.question)
     print(answer.text)
     if answer.refused:
         print(f"\n(declined: {answer.reason})")
     for c in answer.citations:
         print(f"  [{c.n}] {c.source}, page {c.page}")
+    if answer.rewrites:
+        print("\nAlso searched as: " + " | ".join(answer.rewrites))
     if args.show_sources:
         print("\nRetrieved:")
         for i, h in enumerate(answer.hits, start=1):

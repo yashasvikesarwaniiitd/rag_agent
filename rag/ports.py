@@ -48,6 +48,18 @@ class LLMResult:
     model: str = ""
 
 
+@dataclass(frozen=True)
+class Rewrite:
+    queries: list[str]  # extra search phrasings; the original question is NOT included
+    input_tokens: int = 0
+    output_tokens: int = 0
+    model: str = ""
+
+
+class QueryRewriter(Protocol):
+    def rewrite(self, question: str) -> Rewrite: ...
+
+
 class LLM(Protocol):
     def complete(self, *, system: str, user: str, max_tokens: int = 1024,
                  json_schema: dict | None = None) -> LLMResult:

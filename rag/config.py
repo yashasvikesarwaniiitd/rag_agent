@@ -27,6 +27,7 @@ class Settings:
     min_score: float
     rerank_model: str  # "" = no re-ranker
     rerank_pool: int
+    rewrite: bool
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -48,7 +49,21 @@ class Settings:
             rerank_model=os.environ.get("RAG_RERANK_MODEL", DEFAULT_RERANK_MODEL),
             # 25 is chosen for speed; 25/40/60 scored within one question of each other.
             rerank_pool=int(os.environ.get("RAG_RERANK_POOL", "25")),
+            # Off until measured on the golden set. Costs ~$0.0001-0.0002 per question.
+            rewrite=os.environ.get("RAG_REWRITE", "off").lower() in {"on", "1", "true"},
         )
+
+
+def build_rewriter(s: Settings, paid: bool):
+    """Cached query rewriter. paid=False never calls the API: only rewrites already in the
+    cache are used, so the $0 paths (fake model, free evals) stay $0."""
+    from .adapters.rewriters import CachingRewriter, LLMQueryRewriter
+    inner = None
+    if paid:
+        from .adapters.llms import AnthropicLLM
+        inner = LLMQueryRewriter(AnthropicLLM(model=s.model, effort="low"))
+    return CachingRewriter(inner, ROOT / "data" / "cache" / "rewrites.sqlite", s.model,
+                           paid=paid)
 
 
 def build_reranker(s: Settings, model: str | None = None):
@@ -59,11 +74,11 @@ def build_reranker(s: Settings, model: str | None = None):
     return CrossEncoderReranker(name)
 
 
-def build_service(s: Settings, embedder, store, llm, reranker=None):
+def build_service(s: Settings, embedder, store, llm, reranker=None, rewriter=None):
     from .application.answer import RagService
     return RagService(embedder=embedder, store=store, llm=llm, top_k=s.top_k,
                       retrieval=s.retrieval, candidates=s.candidates, min_score=s.min_score,
-                      reranker=reranker, rerank_pool=s.rerank_pool)
+                      reranker=reranker, rerank_pool=s.rerank_pool, rewriter=rewriter)
 
 
 def build_embedder(s: Settings):

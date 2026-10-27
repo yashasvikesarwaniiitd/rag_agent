@@ -24,8 +24,8 @@ sys.path.insert(0, str(ROOT))
 from rag.adapters.llms import AnthropicLLM, ExtractiveLLM, ScriptedLLM  # noqa: E402
 from rag.application.judge import JUDGE_SYSTEM, build_judge_prompt, evaluate_answers  # noqa: E402
 from rag.application.prompts import SYSTEM, build_user_prompt  # noqa: E402
-from rag.config import (Settings, build_embedder, build_reranker, build_service,  # noqa: E402
-                        build_store)
+from rag.config import (Settings, build_embedder, build_reranker, build_rewriter,  # noqa: E402
+                        build_service, build_store)
 from rag.domain.judging import PRICES, summarise_answers  # noqa: E402
 from rag.domain.models import Answer  # noqa: E402
 
@@ -105,6 +105,9 @@ def main() -> int:
                         help="stop asking questions once this much has been spent "
                              "(default $0.05; overshoot is at most one question)")
     parser.add_argument("--no-judge", action="store_true", help="skip the paid judge call")
+    parser.add_argument("--rewrite", action="store_true",
+                        help="add Haiku query rewrites before search (also on if RAG_REWRITE=on); "
+                             "cached ones are free, new ones ~$0.0001-0.0002 each")
     parser.add_argument("--save", metavar="NAME", help="write evals/results/answers-NAME.md/.jsonl")
     args = parser.parse_args()
     # Windows consoles default to cp1252, which cannot print the ✓/✗ marks.
@@ -129,7 +132,12 @@ def main() -> int:
         answer_llm = AnthropicLLM(model=s.model, effort=args.effort)
         judge = AnthropicLLM(model=s.model, effort=args.effort)
         label = f"{s.model}" + (f", effort {args.effort}" if args.effort else "")
-    service = build_service(s, embedder, store, answer_llm, reranker=build_reranker(s))
+    rewriter = None
+    if args.rewrite or s.rewrite:
+        rewriter = build_rewriter(s, paid=not args.fake)  # fake runs use cached rewrites only
+        label += ", with query rewriting"
+    service = build_service(s, embedder, store, answer_llm, reranker=build_reranker(s),
+                            rewriter=rewriter)
 
     def progress(r):
         mark = "✓" if r.correct else "✗"

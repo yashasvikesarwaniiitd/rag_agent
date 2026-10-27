@@ -67,6 +67,7 @@ class Answer:
     refused: bool = False
     reason: str = ""
     raw_model_text: str = ""
+    rewrites: list[str] = field(default_factory=list)  # extra search phrasings used, if any
     latency_ms: int = 0
     input_tokens: int = 0
     output_tokens: int = 0

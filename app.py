@@ -5,8 +5,8 @@ import streamlit as st
 
 from rag.adapters.loaders import SUPPORTED, FileLoader
 from rag.application.ingest import find_files, ingest
-from rag.config import (Settings, build_embedder, build_llm, build_reranker, build_service,
-                        build_store)
+from rag.config import (Settings, build_embedder, build_llm, build_reranker, build_rewriter,
+                        build_service, build_store)
 
 st.set_page_config(page_title="Credentialing RAG", layout="wide")
 settings = Settings.from_env()
@@ -30,6 +30,12 @@ def store():
 @st.cache_resource
 def llm(choice: str):
     return build_llm(settings, choice)
+
+
+@st.cache_resource
+def rewriter(choice: str):
+    # With the free model selected, only cached rewrites are used: picking "fake" means $0.
+    return build_rewriter(settings, paid=choice == "anthropic") if settings.rewrite else None
 
 
 with st.sidebar:
@@ -72,6 +78,8 @@ def render(answer):
     st.markdown(answer.text)
     if answer.refused:
         st.caption(f"Declined: {answer.reason}")
+    if answer.rewrites:
+        st.caption("Also searched as: " + " | ".join(answer.rewrites))
     for c in answer.citations:
         with st.expander(f"[{c.n}] {c.source}, page {c.page}"):
             if c.context:
@@ -98,7 +106,7 @@ if question := st.chat_input("Ask about credentialing requirements..."):
     with st.chat_message("assistant"):
         try:
             service = build_service(settings, embedder(), store(), llm(choice),
-                                    reranker=reranker())
+                                    reranker=reranker(), rewriter=rewriter(choice))
             with st.spinner("Searching documents..."):
                 answer = service.ask(question)
         except Exception as exc:
