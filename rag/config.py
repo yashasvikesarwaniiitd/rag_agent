@@ -28,6 +28,8 @@ class Settings:
     rerank_model: str  # "" = no re-ranker
     rerank_pool: int
     rewrite: bool
+    allow_uploads: bool
+    daily_budget_usd: float | None  # None = no cap (local use)
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -51,6 +53,11 @@ class Settings:
             rerank_pool=int(os.environ.get("RAG_RERANK_POOL", "25")),
             # Off until measured on the golden set. Costs ~$0.0001-0.0002 per question.
             rewrite=os.environ.get("RAG_REWRITE", "off").lower() in {"on", "1", "true"},
+            # Off on a public deployment: otherwise any visitor could add documents that every
+            # other visitor's answers are then built from (including planted instructions).
+            allow_uploads=os.environ.get("RAG_ALLOW_UPLOADS", "on").lower() in {"on", "1", "true"},
+            daily_budget_usd=(float(os.environ["RAG_DAILY_BUDGET_USD"])
+                              if os.environ.get("RAG_DAILY_BUDGET_USD") else None),
         )
 
 

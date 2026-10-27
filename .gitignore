@@ -7,8 +7,19 @@ __pycache__/
 # Vector index is rebuilt from data/raw with `python -m rag ingest`; the embedding cache
 # makes that rebuild fast when chunk texts haven't changed.
 data/index/
-data/cache/
+data/cache/*
+# The vector cache IS committed, so a fresh Streamlit Cloud container builds its index in
+# about a minute instead of re-embedding every chunk.
+!data/cache/embeddings.sqlite
 
-# Source documents stay local until each one is confirmed safe for a public repo.
+# Source documents stay local unless listed here: each one was confirmed public domain
+# (US government / MACPAC). Anything else dropped into data/raw stays out of git.
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/cms_medicare_managed_care_ch6_providers.pdf
+!data/raw/cms_pim_ch10_medicare_enrollment.pdf
+!data/raw/ecfr_42cfr_422.204_ma_provider_selection_credentialing.html
+!data/raw/ecfr_42cfr_438.214_medicaid_provider_selection.html
+!data/raw/macpac_ch7_medicaid_enrollment_credentialing_2026.pdf
+
+.streamlit/secrets.toml

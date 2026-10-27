@@ -11,7 +11,21 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "sentence-transformers>=5.0.0",
     "streamlit>=1.60.0",
+    # Listed directly (it comes in via sentence-transformers) so the CPU-only source below
+    # applies; uv sources only affect direct dependencies.
+    "torch>=2.6",
 ]
+
+# On Linux (Streamlit Community Cloud), PyPI's torch is the CUDA build, which pulls ~70
+# NVIDIA packages and several GB. This app only ever runs on CPU, so Linux gets the
+# CPU-only wheel; Windows/macOS keep PyPI's (already CPU) build.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [dependency-groups]
 dev = [
