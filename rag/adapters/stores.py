@@ -54,6 +54,11 @@ class ChromaStore:
         metas = self._col.get(include=["metadatas"])["metadatas"] or []
         return sorted({m["source"] for m in metas})
 
+    def all_chunks(self) -> list[Chunk]:
+        res = self._col.get(include=["documents", "metadatas"])
+        return [_chunk_from(cid, doc, meta)
+                for cid, doc, meta in zip(res["ids"], res["documents"], res["metadatas"])]
+
 
 class MemoryStore:
     def __init__(self):
@@ -82,3 +87,6 @@ class MemoryStore:
 
     def sources(self) -> list[str]:
         return sorted({c.source for c, _ in self._rows.values()})
+
+    def all_chunks(self) -> list[Chunk]:
+        return [c for c, _ in self._rows.values()]

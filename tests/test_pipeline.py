@@ -74,6 +74,70 @@ def test_extractive_fake_answers_from_the_top_source(indexed_store):
     assert "licensing board" in answer.text
 
 
+class ConstantEmbedder:
+    """Every text gets the same vector, so vector search ranks arbitrarily (by id).
+    Whatever puts the right chunk first must therefore be the keyword half of hybrid."""
+
+    def embed_documents(self, texts):
+        return [[1.0, 0.0] for _ in texts]
+
+    def embed_query(self, text):
+        return [1.0, 0.0]
+
+
+def _constant_store():
+    store = MemoryStore()
+    pages = [Page(f"d{i}", f"d{i}.pdf", 1, f"Medicare enrollment filler text number {i}.")
+             for i in range(8)]
+    pages.append(Page("zz_reg", "zz_reg.html", 1,
+                      "MA organizations must recredential physicians at least every 3 years."))
+    ingest(["x"], loader=ListLoader({"x": pages}), embedder=ConstantEmbedder(), store=store)
+    return store
+
+
+def test_hybrid_finds_the_exact_term_chunk_vectors_missed():
+    store = _constant_store()
+    vector_only = RagService(embedder=ConstantEmbedder(), store=store, llm=ScriptedLLM([]),
+                             top_k=3, retrieval="vector")
+    hybrid = RagService(embedder=ConstantEmbedder(), store=store, llm=ScriptedLLM([]),
+                        top_k=3, retrieval="hybrid")
+    question = "how often must physicians be recredentialed"
+    assert "zz_reg.html" not in [h.chunk.source for h in vector_only.retrieve(question)]
+    assert hybrid.retrieve(question)[0].chunk.source == "zz_reg.html"
+
+
+def test_keyword_index_rebuilds_after_new_documents_are_ingested():
+    store = _constant_store()
+    svc = RagService(embedder=ConstantEmbedder(), store=store, llm=ScriptedLLM([]), top_k=1)
+    svc.retrieve("anything")  # builds the keyword index
+    ingest(["y"], loader=ListLoader({"y": [Page("new", "new.pdf", 1, "DEA registration rules.")]}),
+           embedder=ConstantEmbedder(), store=store)
+    assert svc.retrieve("DEA registration")[0].chunk.source == "new.pdf"
+
+
+def test_off_topic_question_is_declined_before_any_model_call(indexed_store):
+    llm = ScriptedLLM([])
+    embedder, store = indexed_store
+    svc = RagService(embedder=embedder, store=store, llm=llm, min_score=0.3)
+    answer = svc.ask("What is the capital of France?")
+    assert answer.refused and answer.reason.startswith("off-topic")
+    assert llm.calls == []
+
+
+def test_on_topic_question_passes_the_cutoff(indexed_store):
+    embedder, store = indexed_store
+    svc = RagService(embedder=embedder, store=store, llm=ScriptedLLM(["Every 36 months [1]."]),
+                     min_score=0.3)
+    assert not svc.ask("How often are network providers recredentialed?").refused
+
+
+def test_unknown_retrieval_mode_is_rejected():
+    import pytest
+    with pytest.raises(ValueError):
+        RagService(embedder=HashingEmbedder(), store=MemoryStore(), llm=ScriptedLLM([]),
+                   retrieval="magic")
+
+
 def test_reingesting_a_document_replaces_its_old_chunks():
     embedder, store = HashingEmbedder(), MemoryStore()
     v1 = [Page("doc", "doc.pdf", p, f"old text page {p}") for p in (1, 2, 3)]

@@ -4,9 +4,8 @@ from __future__ import annotations
 import streamlit as st
 
 from rag.adapters.loaders import SUPPORTED, FileLoader
-from rag.application.answer import RagService
 from rag.application.ingest import find_files, ingest
-from rag.config import Settings, build_embedder, build_llm, build_store
+from rag.config import Settings, build_embedder, build_llm, build_service, build_store
 
 st.set_page_config(page_title="Credentialing RAG", layout="wide")
 settings = Settings.from_env()
@@ -90,8 +89,7 @@ if question := st.chat_input("Ask about credentialing requirements..."):
         st.markdown(question)
     with st.chat_message("assistant"):
         try:
-            service = RagService(embedder=embedder(), store=store(), llm=llm(choice),
-                                 top_k=settings.top_k)
+            service = build_service(settings, embedder(), store(), llm(choice))
             with st.spinner("Searching documents..."):
                 answer = service.ask(question)
         except Exception as exc:

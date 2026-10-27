@@ -10,10 +10,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from .application.answer import RagService
 from .application.ingest import find_files, ingest
 from .adapters.loaders import FileLoader
-from .config import Settings, build_embedder, build_llm, build_store
+from .config import Settings, build_embedder, build_llm, build_service, build_store
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -54,8 +53,7 @@ def main(argv: list[str] | None = None) -> int:
         # Checked before building the embedder, which loads (and on first use downloads) a model.
         print("No documents are indexed yet. Run: uv run python -m rag ingest", file=sys.stderr)
         return 1
-    service = RagService(embedder=build_embedder(s), store=store,
-                         llm=build_llm(s, args.llm), top_k=s.top_k)
+    service = build_service(s, build_embedder(s), store, build_llm(s, args.llm))
     answer = service.ask(args.question)
     print(answer.text)
     if answer.refused:

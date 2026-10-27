@@ -21,6 +21,9 @@ class Settings:
     llm: str  # "anthropic" | "fake"
     model: str
     top_k: int
+    retrieval: str  # "hybrid" | "vector"
+    candidates: int
+    min_score: float
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -32,7 +35,18 @@ class Settings:
             llm=os.environ.get("RAG_LLM", "fake").lower(),
             model=os.environ.get("RAG_MODEL", DEFAULT_MODEL),
             top_k=int(os.environ.get("RAG_TOP_K", "5")),
+            retrieval=os.environ.get("RAG_RETRIEVAL", "hybrid").lower(),
+            candidates=int(os.environ.get("RAG_CANDIDATES", "30")),
+            # From 7 probe questions: real ones scored 0.72-0.88, "capital of France" 0.43.
+            # Provisional until the golden set gives enough questions to tune it properly.
+            min_score=float(os.environ.get("RAG_MIN_SCORE", "0.6")),
         )
+
+
+def build_service(s: Settings, embedder, store, llm):
+    from .application.answer import RagService
+    return RagService(embedder=embedder, store=store, llm=llm, top_k=s.top_k,
+                      retrieval=s.retrieval, candidates=s.candidates, min_score=s.min_score)
 
 
 def build_embedder(s: Settings):

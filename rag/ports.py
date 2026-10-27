@@ -30,6 +30,8 @@ class VectorStore(Protocol):
 
     def sources(self) -> list[str]: ...
 
+    def all_chunks(self) -> list[Chunk]: ...
+
 
 @dataclass(frozen=True)
 class LLMResult:
