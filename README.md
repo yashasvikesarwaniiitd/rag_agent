@@ -123,6 +123,18 @@ Paid runs default to effort `low` and stop once `--max-cost` (default $0.05) has
 using each response's real token counts. The judge is the same model that wrote the answers,
 so read its "faithful" score as an upper bound.
 
+Results so far: 22 questions per run, scored as fact present AND on topic.
+
+| Run | Correct | Wrong answers shown | Honest "not found" | Cost |
+|---|---|---|---|---|
+| v0.2-haiku: no prompt rules | 18/20 | 1 | 1 | $0.0126 |
+| v0.2-haiku-rules: first rules ("answer the part you can") | 17/20 | 3 | 0 | $0.0124 |
+| **v0.2-haiku-rules2: no related-question answers, no absence claims** | **17/20** | **1 (incomplete list)** | **2** | **$0.0111** |
+
+The remaining gap is retrieval. The two "not found" questions are the plain-English ones
+whose answer pages never reach the top 5, so better wording can't fix them. Each setting has
+one run, and Haiku varies between runs.
+
 **Windows note:** stop the Streamlit app before re-indexing. It holds the index files open,
 and the delete fails with "Device or resource busy".
 
