@@ -11,21 +11,36 @@ DEFAULT_MODEL = "claude-haiku-5-5"
 
 
 class AnthropicLLM:
-    def __init__(self, client=None, model: str = DEFAULT_MODEL):
+    """effort: Haiku 5.5 always thinks, and thinking tokens are billed as output. None keeps
+    the model's default ("medium"); "low" is cheaper and faster for simple extraction."""
+
+    def __init__(self, client=None, model: str = DEFAULT_MODEL, effort: str | None = None):
         if client is None:
             import anthropic
 
             client = anthropic.Anthropic()
         self.client = client
         self.model = model
+        self.effort = effort
 
-    def complete(self, *, system: str, user: str, max_tokens: int = 1024) -> LLMResult:
+    def complete(self, *, system: str, user: str, max_tokens: int = 1024,
+                 json_schema: dict | None = None) -> LLMResult:
+        kwargs = {}
+        output_config = {}
+        if self.effort:
+            output_config["effort"] = self.effort
+        if json_schema:
+            output_config["format"] = {"type": "json_schema", "schema": json_schema}
+        if output_config:
+            kwargs["output_config"] = output_config
         resp = self.client.messages.create(
             model=self.model,
             max_tokens=max_tokens,
-            # The system prompt is identical on every question, so cache it.
+            # The system prompt is identical on every question, so cache it. (Below Haiku
+            # 5.5's 512-token minimum it silently doesn't cache; harmless either way.)
             system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user}],
+            **kwargs,
         )
         if resp.stop_reason == "refusal":
             # Haiku 5.5 has no server-side fallback. Without this check an empty text would
@@ -48,8 +63,10 @@ class ScriptedLLM:
         self._replies = replies
         self.calls: list[dict] = []
 
-    def complete(self, *, system: str, user: str, max_tokens: int = 1024) -> LLMResult:
-        self.calls.append({"system": system, "user": user, "max_tokens": max_tokens})
+    def complete(self, *, system: str, user: str, max_tokens: int = 1024,
+                 json_schema: dict | None = None) -> LLMResult:
+        self.calls.append({"system": system, "user": user, "max_tokens": max_tokens,
+                           "json_schema": json_schema})
         if callable(self._replies):
             text = self._replies(system, user)
         else:
@@ -67,7 +84,8 @@ class ExtractiveLLM:
     def __init__(self, max_chars: int = 400):
         self.max_chars = max_chars
 
-    def complete(self, *, system: str, user: str, max_tokens: int = 1024) -> LLMResult:
+    def complete(self, *, system: str, user: str, max_tokens: int = 1024,
+                 json_schema: dict | None = None) -> LLMResult:
         blocks = _SOURCE_BLOCK.findall(user)
         if not blocks:
             return LLMResult(text="NOT_FOUND", model="extractive")

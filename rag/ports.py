@@ -49,4 +49,7 @@ class LLMResult:
 
 
 class LLM(Protocol):
-    def complete(self, *, system: str, user: str, max_tokens: int = 1024) -> LLMResult: ...
+    def complete(self, *, system: str, user: str, max_tokens: int = 1024,
+                 json_schema: dict | None = None) -> LLMResult:
+        """json_schema, when given, asks for a JSON reply matching it (the judge uses this)."""
+        ...

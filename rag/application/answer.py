@@ -23,7 +23,7 @@ class RagService:
     """
 
     def __init__(self, *, embedder: Embedder, store: VectorStore, llm: LLM, top_k: int = 5,
-                 max_tokens: int = 1024, retrieval: str = "hybrid", candidates: int = 30,
+                 max_tokens: int = 4000, retrieval: str = "hybrid", candidates: int = 30,
                  min_score: float = 0.0, reranker: Reranker | None = None,
                  rerank_pool: int = 25):
         if retrieval not in {"hybrid", "vector"}:
@@ -111,6 +111,10 @@ class RagService:
         base = dict(hits=hits, raw_model_text=result.text, input_tokens=result.input_tokens,
                     output_tokens=result.output_tokens, model=result.model)
 
+        if result.stop_reason == "max_tokens":
+            # Cut off mid-answer: a half sentence can still carry a valid [1] and pass the gate.
+            return done(Answer(text="The answer was cut off before it finished.",
+                               refused=True, reason="answer truncated (max_tokens)", **base))
         gate = check_answer(result.text, len(hits))
         if gate.not_found:
             return done(Answer(text="The indexed documents don't answer this question.",

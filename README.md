@@ -104,6 +104,25 @@ one question are noise. Full per-question tables are in `evals/results/`.
 Still failing: "Should our plan approve Dr. Patel?" is answered instead of declined, which
 needs the router (v0.3).
 
+### Answer quality (Haiku 5.5)
+
+`evals/run_answers.py` asks every golden question, then grades each answer three ways:
+
+- **Correct:** the expected fact (e.g. "3 years") appears in the answer. This is a free string check.
+- **Faithful:** every claim is supported by the sources, judged by Haiku.
+- **On topic:** the answer addresses this question, not a neighbouring rule. Also judged by Haiku.
+
+```bash
+uv run python evals/run_answers.py --dry-run        # $0, cost estimate from the real prompts
+uv run python evals/run_answers.py --fake           # $0, whole loop with fake models
+uv run python evals/run_answers.py --limit 3        # paid, ~$0.002-0.005
+uv run python evals/run_answers.py --save v0.2      # paid, all 22: estimated $0.012-$0.038
+```
+
+Paid runs default to effort `low` and stop once `--max-cost` (default $0.05) has been spent,
+using each response's real token counts. The judge is the same model that wrote the answers,
+so read its "faithful" score as an upper bound.
+
 **Windows note:** stop the Streamlit app before re-indexing. It holds the index files open,
 and the delete fails with "Device or resource busy".
 
