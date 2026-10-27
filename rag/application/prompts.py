@@ -1,6 +1,8 @@
 """Prompt text. Kept byte-stable so the system prompt caches across questions."""
 from __future__ import annotations
 
+from html import escape
+
 from ..domain.citations import NOT_FOUND
 from ..domain.models import Hit
 
@@ -20,7 +22,9 @@ Rules:
 def build_user_prompt(question: str, hits: list[Hit]) -> str:
     blocks = []
     for i, h in enumerate(hits, start=1):
-        section = f' section="{h.chunk.context}"' if h.chunk.context else ""
-        blocks.append(f'<source id="{i}" document="{h.chunk.source}" page="{h.chunk.page}"'
-                      f"{section}>\n{h.chunk.text}\n</source>")
+        # Attribute values are escaped: section labels contain ">" ("Manual > 60.4 ...") and
+        # titles can contain quotes, either of which would otherwise end the tag early.
+        section = f' section="{escape(h.chunk.context)}"' if h.chunk.context else ""
+        blocks.append(f'<source id="{i}" document="{escape(h.chunk.source)}" '
+                      f'page="{h.chunk.page}"{section}>\n{h.chunk.text}\n</source>')
     return "\n\n".join(blocks) + f"\n\nQuestion: {question}"

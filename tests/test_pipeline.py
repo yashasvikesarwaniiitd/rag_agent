@@ -184,6 +184,19 @@ def test_reranker_input_includes_the_section_label():
     assert texts == ["Manual > 60.3 - Credentialing\nEvery 3 years."]
 
 
+def test_section_label_with_angle_brackets_does_not_break_the_source_tag():
+    from rag.application.prompts import build_user_prompt
+    from rag.domain.models import Chunk, Hit
+
+    chunk = Chunk("m:p14:c0", "m", 'Ch "6".pdf', 14, "Must give written notice.",
+                  context="Manual > 60.4 - Termination")
+    prompt = build_user_prompt("q", [Hit(chunk, 1.0)])
+    assert 'section="Manual &gt; 60.4 - Termination">' in prompt
+    assert 'document="Ch &quot;6&quot;.pdf"' in prompt
+    answer = ExtractiveLLM().complete(system="", user=prompt)
+    assert answer.text.startswith('Most relevant passage: "Must give written notice.')
+
+
 def test_reingesting_a_document_replaces_its_old_chunks():
     embedder, store = HashingEmbedder(), MemoryStore()
     v1 = [Page("doc", "doc.pdf", p, f"old text page {p}") for p in (1, 2, 3)]
