@@ -1,0 +1,3 @@
+[browser]
+# Streamlit sends anonymous usage statistics by default; this app keeps everything local.
+gatherUsageStats = false
