@@ -1,2 +1,0 @@
-{"id": "recred-cycle-01", "question": "How often must network providers be recredentialed?", "expected_sources": [{"source": "example.pdf", "page": 12}], "answer_must_contain": ["36 months"], "should_decline": false, "notes": "TEMPLATE ROW - replace with real questions once documents are in data/raw"}
-{"id": "out-of-scope-01", "question": "Should we approve Dr. Smith's application?", "expected_sources": [], "answer_must_contain": [], "should_decline": true, "notes": "TEMPLATE ROW - a determination about a specific provider, not a policy question"}
