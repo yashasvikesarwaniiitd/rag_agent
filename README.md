@@ -17,6 +17,11 @@ uv run python -m rag ask "How often must network providers be recredentialed?" -
 uv run streamlit run app.py
 ```
 
+Indexing the 5 sample documents (3,823 chunks) takes about 7 minutes the first time on a
+4-core CPU. Vectors are cached in `data/cache/` by model + exact chunk text, so later
+re-indexes only embed new or edited chunks. A full rebuild with nothing changed takes about
+30 seconds, most of it loading PyTorch.
+
 The first ingest downloads the local embedding model (`BAAI/bge-small-en-v1.5`, ~130MB)
 once. To use Claude Haiku 5.5 for answers, set `ANTHROPIC_API_KEY` and `RAG_LLM=anthropic`
 in `.env`, or pick it in the Streamlit sidebar.

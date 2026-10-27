@@ -42,8 +42,10 @@ def main(argv: list[str] | None = None) -> int:
         if not paths:
             print(f"No documents found in {s.data_dir}", file=sys.stderr)
             return 1
-        report = ingest(paths, loader=FileLoader(), embedder=build_embedder(s), store=store)
+        embedder = build_embedder(s)
+        report = ingest(paths, loader=FileLoader(), embedder=embedder, store=store)
         print(f"Indexed {len(report.files)} files, {report.pages} pages, {report.chunks} chunks")
+        print(f"  {embedder.misses} chunks embedded, {embedder.hits} reused from the cache")
         if report.empty_pages:
             print(f"  {report.empty_pages} pages had no text")
         for skip in report.skipped:

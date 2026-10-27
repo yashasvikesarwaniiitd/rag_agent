@@ -68,7 +68,9 @@ def build_service(s: Settings, embedder, store, llm, reranker=None):
 
 def build_embedder(s: Settings):
     from .adapters.embedders import SentenceTransformerEmbedder
-    return SentenceTransformerEmbedder(s.embed_model)
+    from .adapters.embedding_cache import CachingEmbedder
+    return CachingEmbedder(SentenceTransformerEmbedder(s.embed_model),
+                           ROOT / "data" / "cache" / "embeddings.sqlite", s.embed_model)
 
 
 def build_store(s: Settings):

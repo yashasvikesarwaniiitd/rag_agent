@@ -39,11 +39,13 @@ def ingest(paths: list[Path], *, loader: Loader, embedder: Embedder, store: Vect
             # Usually a scanned PDF with no text layer - needs OCR, which v0 doesn't do.
             report.skipped.append(f"{Path(path).name}: no extractable text (scanned PDF?)")
             continue
+        # The whole document in one embed call (the embedder batches internally and can
+        # sort by length); only the writes to the store are batched.
+        vectors = embedder.embed_documents([c.text for c in chunks])
         # Re-ingesting a file replaces it, so an edited document leaves no stale chunks.
         store.delete_doc(chunks[0].doc_id)
         for start in range(0, len(chunks), batch_size):
-            batch = chunks[start:start + batch_size]
-            store.upsert(batch, embedder.embed_documents([c.text for c in batch]))
+            store.upsert(chunks[start:start + batch_size], vectors[start:start + batch_size])
         report.files.append(Path(path).name)
         report.chunks += len(chunks)
     return report
