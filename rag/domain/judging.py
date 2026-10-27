@@ -30,12 +30,17 @@ def _normalise(text: str) -> str:
     return re.sub(r"\s+", " ", text)
 
 
+def _present(phrase: str, have: str) -> bool:
+    p = _normalise(phrase).strip()
+    return p in have or p.replace(" years", " year") in have
+
+
 def missing_facts(answer: str, must_contain: list[str]) -> list[str]:
     """Expected phrases absent from the answer. "three years" matches "3 years" and
-    "3-year"; case and spacing are ignored."""
+    "3-year"; case and spacing are ignored. "Inspector General | OIG" is satisfied by
+    either alternative (the same fact is often written two ways)."""
     have = _normalise(answer)
-    return [p for p in must_contain if _normalise(p) not in have
-            and _normalise(p).replace(" years", " year") not in have]
+    return [p for p in must_contain if not any(_present(alt, have) for alt in p.split("|"))]
 
 
 def cost_usd(model: str, input_tokens: int, output_tokens: int,

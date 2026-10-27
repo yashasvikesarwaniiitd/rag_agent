@@ -23,6 +23,22 @@ def test_wrong_rule_is_caught():
     assert missing_facts("Revalidate every five years [1].", ["3 years"]) == ["3 years"]
 
 
+def test_alternatives_accept_either_wording():
+    # Real case: the answer said "OIG", the golden set said "Inspector General".
+    assert missing_facts("Check the OIG sanction list [1].", ["Inspector General | OIG"]) == []
+    assert missing_facts("Office of Inspector General list [1].", ["Inspector General | OIG"]) == []
+    assert missing_facts("Check the state list [1].", ["Inspector General | OIG"]) == [
+        "Inspector General | OIG"]
+
+
+def test_answer_prompt_forbids_absence_claims_and_reworded_references():
+    # Both rules come from failures in the first Haiku run (evals/results/answers-v0.2-haiku).
+    from rag.application.prompts import SYSTEM
+
+    assert "Never state that the documents" in SYSTEM
+    assert '"this title"' in SYSTEM
+
+
 def test_case_and_spacing_are_ignored():
     assert missing_facts("Must hold   LTSS and Mental Health", ["mental health", "LTSS"]) == []
 
